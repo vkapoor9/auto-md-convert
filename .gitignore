@@ -1,0 +1,19 @@
+# Local config and generated artifacts
+config.json
+logs/
+
+# Local session history and personal notes (not for distribution)
+memory/
+.save-everything-id
+
+# Captured files and archived originals
+emails/
+**/.eml-archive/
+**/.originals/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

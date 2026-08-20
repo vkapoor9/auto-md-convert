@@ -1,0 +1,6 @@
+{
+  "watchFolders": [
+    "~/ai/my-project/emails"
+  ],
+  "pollSeconds": 2
+}
