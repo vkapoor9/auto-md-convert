@@ -180,3 +180,7 @@ python3 dropzone/install_quick_action.py --uninstall
 The watcher runs locally and only reads files in the folders you enable. It writes
 Markdown next to them and archives the originals into `.originals/`. Captured output
 and the `.originals` archive are git-ignored by default.
+
+---
+
+Crafted by VK.

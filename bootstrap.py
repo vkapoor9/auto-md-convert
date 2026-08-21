@@ -45,6 +45,54 @@ def step(msg: str) -> None:
     print(f"\n{_C['b']}==>{_C['0']} {msg}")
 
 
+# --------------------------------------------------------------------------- #
+# Splash (teal -> navy gradient banner with a VK credit monogram)
+# --------------------------------------------------------------------------- #
+
+_SPLASH_BLOCK = [
+    " █████╗ ██╗   ██╗████████╗ ██████╗    ███╗   ███╗██████╗ ",
+    "██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗   ████╗ ████║██╔══██╗",
+    "███████║██║   ██║   ██║   ██║   ██║   ██╔████╔██║██║  ██║",
+    "██╔══██║██║   ██║   ██║   ██║   ██║   ██║╚██╔╝██║██║  ██║",
+    "██║  ██║╚██████╔╝   ██║   ╚██████╔╝   ██║ ╚═╝ ██║██████╔╝",
+    "╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝    ╚═╝     ╚═╝╚═════╝ ",
+]
+
+_SPLASH_VK = [
+    "██╗   ██╗██╗  ██╗",
+    "██║   ██║██║ ██╔╝",
+    "██║   ██║█████╔╝ ",
+    "╚██╗ ██╔╝██╔═██╗ ",
+    " ╚████╔╝ ██║  ██╗",
+    "  ╚═══╝  ╚═╝  ╚═╝",
+]
+
+
+def _rgb(r: int, g: int, b: int) -> str:
+    return f"\033[38;2;{r};{g};{b}m"
+
+
+def splash() -> None:
+    """Print the AUTO MD banner (teal to navy) with a VK credit signature."""
+    if os.environ.get("AUTOMDCONVERT_NO_SPLASH"):
+        return
+    top, bot = (45, 212, 191), (30, 58, 138)  # 1g: teal -> navy
+    n = len(_SPLASH_BLOCK)
+    print()
+    for i, line in enumerate(_SPLASH_BLOCK):
+        t = i / (n - 1)
+        c = tuple(round(top[k] + (bot[k] - top[k]) * t) for k in range(3))
+        print(_rgb(*c) + _C["b"] + line + _C["0"])
+    print("\033[2m        documents in, clean Markdown out, automatically\033[0m")
+    print()
+    teal = _rgb(45, 212, 191)
+    credit = {2: "crafted by", 3: "VK"}
+    for i, line in enumerate(_SPLASH_VK):
+        tail = f"   \033[2m{credit[i]}\033[0m" if i in credit else ""
+        print("   " + teal + _C["b"] + line + _C["0"] + tail)
+    print()
+
+
 _answers_iter = None
 
 
@@ -125,7 +173,7 @@ def load_launch_agent(plist: Path, label: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 def main() -> int:
-    say(f"\n{_C['b']}AutoMDConvert setup{_C['0']}")
+    splash()
     say("Converts documents you drop into folders you choose into Markdown for your agent.\n")
 
     if sys.version_info < MIN_PY:
