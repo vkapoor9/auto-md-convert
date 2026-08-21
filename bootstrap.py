@@ -27,6 +27,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
 HOME = Path.home()
+MIN_PY = (3, 9)
 
 
 # --------------------------------------------------------------------------- #
@@ -67,6 +68,12 @@ def ask(prompt: str, default: str) -> str:
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def module_available(name: str) -> bool:
+    """True if `name` imports in a fresh interpreter (picks up a just-done --user install)."""
+    res = run([sys.executable, "-c", f"import importlib.util as u; raise SystemExit(0 if u.find_spec('{name}') else 1)"])
+    return res.returncode == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -121,6 +128,13 @@ def main() -> int:
     say(f"\n{_C['b']}AutoMDConvert setup{_C['0']}")
     say("Converts documents you drop into folders you choose into Markdown for your agent.\n")
 
+    if sys.version_info < MIN_PY:
+        have = f"{sys.version_info.major}.{sys.version_info.minor}"
+        say(f"This needs Python {MIN_PY[0]}.{MIN_PY[1]} or newer, but setup is running on Python {have}.", "r")
+        say("Install a newer Python, then run setup again:", "y")
+        say("  https://www.python.org/downloads/   (or: brew install python)", "b")
+        return 1
+
     # Preserve any folders already configured (safe to re-run setup, e.g. after a rename).
     existing: dict = {}
     try:
@@ -155,18 +169,25 @@ def main() -> int:
     else:
         say("   no folders watched yet (add with dropzone/watch_folder.py add <path>)", "y")
 
-    # 2. optional converters (markitdown adds PDF/PPTX/XLSX; textutil covers the rest)
+    # 2. optional converters (markitdown adds PDF/PPTX/XLSX/XLS; textutil covers the rest)
     step("Installing optional converters (markitdown for PDF/Office, html2text)")
     if os.environ.get("AUTOMDCONVERT_SKIP_PIP"):
         say("   (skipped pip install)", "y")
     else:
-        res = run([sys.executable, "-m", "pip", "install", "--user", "--quiet",
-                   "markitdown[docx,pptx,xlsx,pdf]", "html2text"])
-        if res.returncode == 0:
-            say("   installed markitdown + html2text (full format support)", "g")
-        else:
-            say("   markitdown not installed; Word/RTF/HTML/eml/txt/csv still work via built-ins", "y")
-            say("   for PDF/PPTX/XLSX, install markitdown (see README)", "y")
+        pkgs = ["markitdown[docx,pptx,xlsx,xls,pdf]", "html2text", "ebooklib", "openpyxl"]
+        r = run([sys.executable, "-m", "pip", "install", "--user", "--quiet", *pkgs])
+        if r.returncode != 0:
+            # Homebrew/externally-managed Pythons reject --user; retry the modern way.
+            run([sys.executable, "-m", "pip", "install", "--break-system-packages", "--quiet", *pkgs])
+    # Report the real capability, regardless of how the install went.
+    have_markitdown = module_available("markitdown")
+    if have_markitdown:
+        say("   full format support enabled: PDF, PowerPoint, Excel, Word, and more", "g")
+    else:
+        say("   Email, Word, RTF, HTML, and text/csv/json convert out of the box.", "y")
+        say("   PDF, PowerPoint, and Excel need markitdown, which is not available yet.", "y")
+        say("   To enable them later, run:", "y")
+        say('     python3 -m pip install --user "markitdown[docx,pptx,xlsx,pdf]"', "b")
 
     # 3. drop-zone watcher LaunchAgent
     step("Installing the drop-zone watcher (auto-start at login)")
@@ -179,6 +200,22 @@ def main() -> int:
     say("   watcher running" if ok else "   watcher installed (load it with: launchctl load -w " + str(watcher_plist) + ")",
         "g" if ok else "y")
 
+    # 3b. Finder Quick Action (right-click any file > Convert to Markdown)
+    step("Installing the Finder Quick Action (right-click > Convert to Markdown)")
+    if os.environ.get("AUTOMDCONVERT_SKIP_QUICKACTION"):
+        say("   (skipped Quick Action install)", "y")
+    else:
+        try:
+            sys.path.insert(0, str(REPO / "dropzone"))
+            import install_quick_action as qa
+            if qa.install():
+                say("   installed. Right-click a file in Finder > Quick Actions.", "g")
+                say("   First time only: Quick Actions > Customize... and turn on 'Convert to Markdown'.", "y")
+            else:
+                say("   Quick Action written, but plist validation flagged an issue (see above)", "y")
+        except Exception as exc:
+            say(f"   could not install Quick Action: {exc}", "y")
+
     # 4. smoke test
     step("Smoke test: converting a sample email")
     smoke_test()
@@ -188,7 +225,7 @@ def main() -> int:
     if code and not os.environ.get("AUTOMDCONVERT_SKIP_OPEN"):
         run([code, str(REPO)])
 
-    print_summary(config)
+    print_summary(config, have_markitdown)
     return 0
 
 
@@ -210,10 +247,14 @@ def smoke_test() -> None:
     say("   converter works" if ok else "   smoke test failed", "g" if ok else "r")
 
 
-def print_summary(config: dict) -> None:
+def print_summary(config: dict, have_markitdown: bool = True) -> None:
     print(f"\n{_C['g']}{_C['b']}Setup complete.{_C['0']}\n")
     folders = config.get("watchFolders", [])
     wf = REPO / "dropzone" / "watch_folder.py"
+    if have_markitdown:
+        say("Formats: email, Word, PowerPoint, Excel, PDF, HTML, RTF, CSV, and more.")
+    else:
+        say("Formats: email, Word, RTF, HTML, text/csv/json now; PDF/PPTX/XLSX after installing markitdown.", "y")
     if folders:
         say("Watching (emails dropped here auto-convert to Markdown):")
         for f in folders:
@@ -224,6 +265,7 @@ def print_summary(config: dict) -> None:
     say("\nHow it works:")
     say("  Drag an email into a watched folder and it becomes a clean Markdown file.")
     say("  Drop a .eml anywhere else, or in a subfolder, to keep it as a raw .eml.")
+    say("  Or right-click a file in Finder > Quick Actions (first time: Quick Actions > Customize to enable).")
     say(f"\nManage folders: python3 {wf} list | add <path> | remove <path>")
 
 

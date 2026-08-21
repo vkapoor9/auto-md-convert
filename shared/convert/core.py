@@ -35,7 +35,7 @@ _DEFAULT_CONFIG = {
 SUPPORTED_EXTS = {
     ".eml",
     ".doc", ".docx", ".rtf", ".odt",
-    ".ppt", ".pptx",
+    ".pptx",
     ".xls", ".xlsx", ".csv",
     ".pdf",
     ".html", ".htm",
@@ -49,6 +49,10 @@ _TEXTUTIL_EXTS = {".doc", ".docx", ".rtf", ".odt", ".html", ".htm", ".wordml", "
 
 # Formats markitdown handles poorly (returns raw markup); prefer textutil for these.
 _TEXTUTIL_FIRST = {".rtf", ".doc", ".odt", ".wordml", ".webarchive"}
+
+# Spreadsheets we convert with openpyxl first: cleaner tables, blanks instead of
+# markitdown's pandas "NaN", and no dependency on markitdown's optional xlsx extra.
+_XLSX_FIRST = {".xlsx", ".xlsm"}
 
 
 def load_config() -> dict:
@@ -271,6 +275,12 @@ def _convert_other(path: Path) -> str | None:
         if t and t.strip():
             return t
 
+    # XLSX/XLSM: openpyxl gives cleaner tables than markitdown (no "NaN" blanks).
+    if ext in _XLSX_FIRST:
+        x = _xlsx_to_markdown(path)
+        if x and x.strip():
+            return x
+
     md = _markitdown(path)
     if md and md.strip():
         return md
@@ -299,6 +309,44 @@ def _markitdown(path: Path) -> str | None:
         return MarkItDown().convert(str(path)).text_content
     except Exception:
         return None
+
+
+def _xlsx_to_markdown(path: Path) -> str | None:
+    """Render an .xlsx/.xlsm workbook as one Markdown table per non-empty sheet."""
+    try:
+        from openpyxl import load_workbook  # type: ignore
+    except Exception:
+        return None
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception:
+        return None
+
+    def cell(value) -> str:
+        if value is None:
+            return ""
+        return str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ").strip()
+
+    out: list[str] = []
+    for ws in wb.worksheets:
+        rows = [r for r in ws.iter_rows(values_only=True)
+                if any(c is not None and str(c).strip() != "" for c in r)]
+        if not rows:
+            continue
+        width = max(len(r) for r in rows)
+        out.append(f"## {ws.title}")
+        header = list(rows[0]) + [None] * (width - len(rows[0]))
+        out.append("| " + " | ".join(cell(c) for c in header) + " |")
+        out.append("| " + " | ".join(["---"] * width) + " |")
+        for r in rows[1:]:
+            padded = list(r) + [None] * (width - len(r))
+            out.append("| " + " | ".join(cell(c) for c in padded) + " |")
+        out.append("")
+    try:
+        wb.close()
+    except Exception:
+        pass
+    return "\n".join(out).strip() or None
 
 
 def _textutil(path: Path) -> str | None:

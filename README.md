@@ -10,7 +10,20 @@ untouched. That is the whole tool.
 
 ## Requirements
 
-macOS (the watcher runs as a login LaunchAgent and uses `textutil`) and Python 3.
+You only need two things before you start. Setup handles everything else.
+
+| Prerequisite | Needed for | How to get it |
+|---|---|---|
+| macOS | The watcher runs as a login LaunchAgent and uses `textutil` | Already on your Mac |
+| Python 3.9 or newer | Running setup and the watcher | Installer at https://www.python.org/downloads/, or `xcode-select --install`, or `brew install python` |
+
+Check what you have with `python3 --version`. If it prints 3.9 or higher, you are
+ready. If Python is missing or too old, `setup.command` detects it and tells you
+exactly what to install before it does anything else.
+
+Everything else is installed for you by setup: the `markitdown` and `html2text`
+converters (via `pip`) and the background watcher service. The only thing setup ever
+asks you is which folder to watch, and even that is optional.
 
 ## Why it works this way
 
@@ -20,9 +33,18 @@ email, Word, PDF, and everything else. No app scripting or plugins required.
 
 ## Quick start
 
-Double-click `setup.command` (or run `python3 bootstrap.py`). It optionally enables
-a first folder to watch, installs a background watcher that auto-starts at login,
-and runs a smoke test. Nothing is watched until you choose a folder.
+1. Confirm Python 3.9+ is installed (`python3 --version`). See Requirements above if not.
+2. Double-click `setup.command` (or run `python3 bootstrap.py`).
+3. When asked, type a folder to watch, or press Return to skip and add one later.
+
+That is it. Setup installs the converters, installs a background watcher that
+auto-starts at login, runs a smoke test, and opens VS Code. Nothing is watched
+until you choose a folder.
+
+If Python is missing, `setup.command` stops with clear install instructions instead
+of failing part way. Email, Word, RTF, HTML, and text/csv/json convert with zero
+extra installs; PDF, PowerPoint, and Excel light up once `markitdown` installs (setup
+does this automatically and tells you if it could not).
 
 ## Choosing which folders to watch
 
@@ -65,22 +87,51 @@ To keep a file as-is instead, drop it into a folder that is not watched, or into
 subfolder of a watched folder (the watcher looks only at the exact watched folders,
 not their subfolders).
 
+## Convert any file from Finder (Quick Action)
+
+Setup also installs a Finder Quick Action so you can convert files anywhere, not just
+in watched folders. Right-click one or more files in Finder and choose
+**Quick Actions > Convert to Markdown**. Each supported file becomes a `.md` next to
+the original, and the original is left in place (unlike the watcher, which archives it).
+Unsupported selections are skipped, and a notification summarizes the result.
+
+Manage it yourself anytime:
+
+```
+python3 dropzone/install_quick_action.py             # install or update
+python3 dropzone/install_quick_action.py --uninstall # remove
+```
+
+You can also convert from the command line without Finder:
+
+```
+python3 dropzone/convert_path.py ~/Desktop/report.pdf notes.docx
+```
+
+If the menu item does not appear right after install, right-click a file, open the
+Quick Actions submenu, click **Customize...**, and turn on **Convert to Markdown**.
+Recent macOS hides newly installed Quick Actions until you enable them there once.
+(You can also toggle it under System Settings > Keyboard > Keyboard Shortcuts >
+Services > Files and Folders.)
+
 ## Supported formats
 
 - Email: `.eml`
 - Word and rich text: `.docx`, `.doc`, `.rtf`, `.odt`
-- PowerPoint: `.pptx`, `.ppt`
+- PowerPoint: `.pptx` (legacy `.ppt` is not supported; re-save it as `.pptx`)
 - Excel and data: `.xlsx`, `.xls`, `.csv`
 - PDF: `.pdf`
 - Web and markup: `.html`, `.htm`, `.xml`, `.json`
 - Plain text and books: `.txt`, `.epub`
 
-Word, RTF, ODT, HTML, email, and text/csv/json work out of the box (macOS
-`textutil` plus built-ins). PDF, PowerPoint, and Excel need `markitdown`, which
-setup tries to install. To add it later:
+Email, Word, RTF, ODT, HTML, and text/csv/json/xml convert out of the box (macOS
+`textutil` plus built-ins), and `.xlsx` uses `openpyxl`. PDF, PowerPoint (`.pptx`),
+legacy Excel (`.xls`), and EPUB rely on `markitdown` and a couple of helper libraries,
+which setup installs for you (`markitdown` extras, `ebooklib`, `openpyxl`). To add them
+later:
 
 ```
-python3 -m pip install --user "markitdown[docx,pptx,xlsx,pdf]"
+python3 -m pip install --user "markitdown[docx,pptx,xlsx,xls,pdf]" ebooklib openpyxl html2text
 ```
 
 ## How your agent uses it
@@ -110,6 +161,8 @@ setup.command             Double-click launcher for bootstrap
 shared/convert/           File-to-Markdown core (email, Office, PDF, HTML, ...)
 dropzone/watch.py         Background watcher for dropped files
 dropzone/watch_folder.py  Enable/disable which folders are watched
+dropzone/convert_path.py  Convert specific files to Markdown in place (CLI)
+dropzone/install_quick_action.py  Install/remove the Finder "Convert to Markdown" Quick Action
 shortcuts.zsh             Optional zsh shortcuts (add-folder/list-folder/remove-folder)
 handoff-prompt.md         Prompt to hand another project's agent
 ```
@@ -119,6 +172,7 @@ handoff-prompt.md         Prompt to hand another project's agent
 ```
 launchctl bootout gui/$(id -u)/com.automdconvert.watcher
 rm ~/Library/LaunchAgents/com.automdconvert.watcher.plist
+python3 dropzone/install_quick_action.py --uninstall
 ```
 
 ## Notes on security
