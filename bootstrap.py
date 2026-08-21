@@ -58,15 +58,6 @@ _SPLASH_BLOCK = [
     "╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝    ╚═╝     ╚═╝╚═════╝ ",
 ]
 
-_SPLASH_VK = [
-    "██╗   ██╗██╗  ██╗",
-    "██║   ██║██║ ██╔╝",
-    "██║   ██║█████╔╝ ",
-    "╚██╗ ██╔╝██╔═██╗ ",
-    " ╚████╔╝ ██║  ██╗",
-    "  ╚═══╝  ╚═╝  ╚═╝",
-]
-
 
 def _rgb(r: int, g: int, b: int) -> str:
     return f"\033[38;2;{r};{g};{b}m"
@@ -85,11 +76,11 @@ def splash() -> None:
         print(_rgb(*c) + _C["b"] + line + _C["0"])
     print("\033[2m        documents in, clean Markdown out, automatically\033[0m")
     print()
-    teal = _rgb(45, 212, 191)
-    credit = {2: "crafted by", 3: "VK"}
-    for i, line in enumerate(_SPLASH_VK):
-        tail = f"   \033[2m{credit[i]}\033[0m" if i in credit else ""
-        print("   " + teal + _C["b"] + line + _C["0"] + tail)
+    brk = _rgb(59, 130, 246)    # blue corner brackets
+    ltr = _rgb(147, 197, 253)   # light-blue VK
+    mono = "VK" if os.environ.get("AUTOMDCONVERT_PLAIN_VK") else "𝗩𝗞"
+    badge = f"{brk}「{_C['0']} {ltr}{_C['b']}{mono}{_C['0']} {brk}」{_C['0']}"
+    print(f"        {badge}   \033[2mcrafted by VK\033[0m")
     print()
 
 
