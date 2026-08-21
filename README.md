@@ -158,6 +158,7 @@ After editing, restart the watcher:
 ```
 bootstrap.py              One-shot installer
 setup.command             Double-click launcher for bootstrap
+splash.py                 Reusable startup banner + VK credit (drop into any repo)
 shared/convert/           File-to-Markdown core (email, Office, PDF, HTML, ...)
 dropzone/watch.py         Background watcher for dropped files
 dropzone/watch_folder.py  Enable/disable which folders are watched
@@ -166,6 +167,10 @@ dropzone/install_quick_action.py  Install/remove the Finder "Convert to Markdown
 shortcuts.zsh             Optional zsh shortcuts (add-folder/list-folder/remove-folder)
 handoff-prompt.md         Prompt to hand another project's agent
 ```
+
+Reuse the splash on any repo: copy `splash.py` and run `python3 splash.py "YOUR TITLE"`
+(or `from splash import render`). `SPLASH_OFF=1` skips it; `SPLASH_PLAIN_VK=1` uses a
+plain `VK` for terminals without the styled glyph.
 
 ## Uninstall
 

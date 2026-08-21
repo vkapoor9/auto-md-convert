@@ -31,7 +31,9 @@ fi
 
 echo "Using $("$PY" --version 2>&1) at $(command -v "$PY")"
 echo ""
-"$PY" bootstrap.py
+# Show the splash from the command file itself, then let bootstrap skip its own.
+"$PY" splash.py
+SPLASH_OFF=1 "$PY" bootstrap.py
 echo ""
 echo "Press Return to close."
 read -r _

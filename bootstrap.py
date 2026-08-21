@@ -45,43 +45,16 @@ def step(msg: str) -> None:
     print(f"\n{_C['b']}==>{_C['0']} {msg}")
 
 
-# --------------------------------------------------------------------------- #
-# Splash (teal -> navy gradient banner with a VK credit monogram)
-# --------------------------------------------------------------------------- #
-
-_SPLASH_BLOCK = [
-    " █████╗ ██╗   ██╗████████╗ ██████╗    ███╗   ███╗██████╗ ",
-    "██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗   ████╗ ████║██╔══██╗",
-    "███████║██║   ██║   ██║   ██║   ██║   ██╔████╔██║██║  ██║",
-    "██╔══██║██║   ██║   ██║   ██║   ██║   ██║╚██╔╝██║██║  ██║",
-    "██║  ██║╚██████╔╝   ██║   ╚██████╔╝   ██║ ╚═╝ ██║██████╔╝",
-    "╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝    ╚═╝     ╚═╝╚═════╝ ",
-]
-
-
-def _rgb(r: int, g: int, b: int) -> str:
-    return f"\033[38;2;{r};{g};{b}m"
-
-
 def splash() -> None:
-    """Print the AUTO MD banner (teal to navy) with a VK credit signature."""
-    if os.environ.get("AUTOMDCONVERT_NO_SPLASH"):
+    """Print the startup banner + VK credit (shared, portable splash.py)."""
+    if os.environ.get("SPLASH_OFF"):
         return
-    top, bot = (45, 212, 191), (30, 58, 138)  # 1g: teal -> navy
-    n = len(_SPLASH_BLOCK)
-    print()
-    for i, line in enumerate(_SPLASH_BLOCK):
-        t = i / (n - 1)
-        c = tuple(round(top[k] + (bot[k] - top[k]) * t) for k in range(3))
-        print(_rgb(*c) + _C["b"] + line + _C["0"])
-    print("\033[2m        documents in, clean Markdown out, automatically\033[0m")
-    print()
-    brk = _rgb(59, 130, 246)    # blue corner brackets
-    ltr = _rgb(147, 197, 253)   # light-blue VK
-    mono = "VK" if os.environ.get("AUTOMDCONVERT_PLAIN_VK") else "𝗩𝗞"
-    badge = f"{brk}「{_C['0']} {ltr}{_C['b']}{mono}{_C['0']} {brk}」{_C['0']}"
-    print(f"        {badge}   \033[2mcrafted by VK\033[0m")
-    print()
+    try:
+        sys.path.insert(0, str(REPO))
+        from splash import render
+        render()
+    except Exception:
+        pass
 
 
 _answers_iter = None
