@@ -15,7 +15,6 @@ After a change it restarts the watcher so it takes effect immediately.
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -24,17 +23,17 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 CONFIG = REPO / "config.json"
 LABEL = "com.automdconvert.watcher"
+sys.path.insert(0, str(REPO))
+
+from shared.convert import core  # noqa: E402
 
 
 def load() -> dict:
-    try:
-        return json.loads(CONFIG.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"watchFolders": [], "pollSeconds": 2}
+    return core.load_config(CONFIG)
 
 
 def save(cfg: dict) -> None:
-    CONFIG.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+    core.save_config(cfg, CONFIG)
 
 
 def resolve_target(arg: str | None) -> Path:
@@ -45,11 +44,16 @@ def resolve_target(arg: str | None) -> Path:
 
 def restart_watcher() -> None:
     uid = os.getuid()
-    res = subprocess.run(
-        ["launchctl", "kickstart", "-k", f"gui/{uid}/{LABEL}"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        res = subprocess.run(
+            ["launchctl", "kickstart", "-k", f"gui/{uid}/{LABEL}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"Configuration saved, but could not restart watcher: {exc}", file=sys.stderr)
+        return
     if res.returncode == 0:
         print("Watcher restarted.")
     else:
@@ -69,9 +73,9 @@ def cmd_list() -> int:
 
 
 def cmd_add(arg: str | None) -> int:
+    cfg = load()
     target = resolve_target(arg)
     target.mkdir(parents=True, exist_ok=True)
-    cfg = load()
     folders = cfg.setdefault("watchFolders", [])
     entry = str(target)
     if entry in folders:
@@ -105,12 +109,19 @@ def main(argv: list[str]) -> int:
         return 0
     action = argv[0]
     arg = argv[1] if len(argv) > 1 else None
-    if action == "list":
-        return cmd_list()
-    if action == "add":
-        return cmd_add(arg)
-    if action == "remove":
-        return cmd_remove(arg)
+    if len(argv) > (1 if action == "list" else 2):
+        print("Too many arguments.", file=sys.stderr)
+        return 1
+    try:
+        if action == "list":
+            return cmd_list()
+        if action == "add":
+            return cmd_add(arg)
+        if action == "remove":
+            return cmd_remove(arg)
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     print(f"Unknown command: {action}")
     print(__doc__)
     return 1

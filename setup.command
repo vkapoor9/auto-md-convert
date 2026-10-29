@@ -1,6 +1,7 @@
 #!/bin/bash
 # Double-click this file in Finder to set up AutoMDConvert.
 cd "$(dirname "$0")" || exit 1
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 echo "Starting AutoMDConvert setup..."
 echo ""
@@ -34,6 +35,10 @@ echo ""
 # Show the splash from the command file itself, then let bootstrap skip its own.
 "$PY" splash.py
 SPLASH_OFF=1 "$PY" bootstrap.py
+status=$?
 echo ""
-echo "Press Return to close."
-read -r _
+if [ -t 0 ]; then
+  echo "Press Return to close."
+  read -r _
+fi
+exit "$status"

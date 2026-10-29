@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -33,7 +34,8 @@ def services_dir() -> Path:
 
 def find_python() -> str:
     """Pick a Python 3.9+ interpreter to bake into the action."""
-    for cand in (sys.executable, "python3", "python3.14", "python3.13",
+    for cand in (str(REPO / ".venv" / "bin" / "python3"), sys.executable,
+                 "python3", "python3.14", "python3.13",
                  "python3.12", "python3.11", "python3.10", "python3.9"):
         exe = shutil.which(cand) if not cand.startswith("/") else cand
         if not exe or not Path(exe).exists():
@@ -47,7 +49,7 @@ def find_python() -> str:
             continue
         if r.returncode == 0:
             return exe
-    return sys.executable
+    raise RuntimeError("No working Python 3.9+ interpreter found.")
 
 
 def _info_plist() -> str:
@@ -296,9 +298,19 @@ def bundle_path() -> Path:
     return services_dir() / f"{SERVICE_NAME}.workflow"
 
 
-def install() -> bool:
-    py = find_python()
-    command = f'"{py}" "{REPO / "dropzone" / "convert_path.py"}" "$@"'
+def _refresh_services() -> None:
+    try:
+        result = subprocess.run(["/System/Library/CoreServices/pbs", "-flush"],
+                                capture_output=True, text=True, timeout=30)
+        if result.returncode:
+            print(f"Could not refresh Quick Actions: {result.stderr.strip()}", file=sys.stderr)
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"Could not refresh Quick Actions: {exc}", file=sys.stderr)
+
+
+def install(python: str | None = None) -> bool:
+    py = python or find_python()
+    command = shlex.join([py, str(REPO / "dropzone" / "convert_path.py")]) + ' "$@"'
 
     bundle = bundle_path()
     contents = bundle / "Contents"
@@ -310,33 +322,48 @@ def install() -> bool:
 
     ok = True
     for p in (info, wflow):
-        r = subprocess.run(["plutil", "-lint", str(p)], capture_output=True, text=True)
+        r = subprocess.run(["plutil", "-lint", str(p)], capture_output=True, text=True, timeout=30)
         if r.returncode != 0:
             print(f"plist lint failed for {p.name}: {r.stdout.strip() or r.stderr.strip()}",
                   file=sys.stderr)
             ok = False
 
-    # Refresh the Services/Quick Actions registry and reload Finder so it shows up.
-    subprocess.run(["/System/Library/CoreServices/pbs", "-flush"], capture_output=True)
-    subprocess.run(["killall", "-KILL", "pbs"], capture_output=True)
-    subprocess.run(["killall", "Finder"], capture_output=True)
+    if ok:
+        _refresh_services()
     return ok
 
 
 def uninstall() -> bool:
     bundle = bundle_path()
-    if bundle.exists():
-        shutil.rmtree(bundle, ignore_errors=True)
-    subprocess.run(["/System/Library/CoreServices/pbs", "-flush"], capture_output=True)
+    try:
+        if bundle.is_symlink():
+            bundle.unlink()
+        elif bundle.exists():
+            shutil.rmtree(bundle)
+    except OSError as exc:
+        print(f"Could not remove Quick Action: {exc}", file=sys.stderr)
+        return False
+    _refresh_services()
     return True
 
 
 def main(argv: list[str]) -> int:
-    if "--uninstall" in argv:
-        uninstall()
-        print(f"Removed the '{SERVICE_NAME}' Quick Action.")
+    if argv in (["-h"], ["--help"]):
+        print(__doc__)
         return 0
-    ok = install()
+    if argv and argv != ["--uninstall"]:
+        print("Usage: install_quick_action.py [--uninstall]", file=sys.stderr)
+        return 1
+    if argv == ["--uninstall"]:
+        if uninstall():
+            print(f"Removed the '{SERVICE_NAME}' Quick Action.")
+            return 0
+        return 1
+    try:
+        ok = install()
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(f"Could not install Quick Action: {exc}", file=sys.stderr)
+        return 1
     if ok:
         print(f"Installed the '{SERVICE_NAME}' Quick Action.")
         print("To use it: right-click a supported file in Finder, open the Quick Actions submenu.")

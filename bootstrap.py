@@ -13,17 +13,19 @@ HTML, RTF, CSV, and more. Drop a file anywhere else to leave it untouched.
 
 Environment overrides used only for testing (leave unset for a normal install):
   AUTOMDCONVERT_LAUNCHAGENTS_DIR, AUTOMDCONVERT_SKIP_LOAD, AUTOMDCONVERT_SKIP_PIP,
-  AUTOMDCONVERT_SKIP_OPEN, AUTOMDCONVERT_ANSWERS (newline-joined for non-interactive runs).
+  AUTOMDCONVERT_SKIP_OPEN, AUTOMDCONVERT_SKIP_QUICKACTION,
+  AUTOMDCONVERT_ANSWERS (newline-joined for non-interactive runs).
 """
 
 from __future__ import annotations
 
-import json
 import os
+import plistlib
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from shared.convert import core
 
 REPO = Path(__file__).resolve().parent
 HOME = Path.home()
@@ -53,8 +55,8 @@ def splash() -> None:
         sys.path.insert(0, str(REPO))
         from splash import render
         render()
-    except Exception:
-        pass
+    except ImportError as exc:
+        say(f"   could not load startup banner: {exc}", "y")
 
 
 _answers_iter = None
@@ -79,12 +81,14 @@ def ask(prompt: str, default: str) -> str:
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
+    kw.setdefault("timeout", 600)
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
-def module_available(name: str) -> bool:
-    """True if `name` imports in a fresh interpreter (picks up a just-done --user install)."""
-    res = run([sys.executable, "-c", f"import importlib.util as u; raise SystemExit(0 if u.find_spec('{name}') else 1)"])
+def module_available(name: str, python: str | None = None) -> bool:
+    """Check that a converter imports in the interpreter used by the watcher."""
+    res = run([python or sys.executable, "-c",
+               "import importlib, sys; importlib.import_module(sys.argv[1])", name])
     return res.returncode == 0
 
 
@@ -99,24 +103,15 @@ def launchagents_dir() -> Path:
 def write_launch_agent(label: str, program_args: list[str], log_path: Path) -> Path:
     d = launchagents_dir()
     d.mkdir(parents=True, exist_ok=True)
-    args_xml = "".join(f"      <string>{a}</string>\n" for a in program_args)
-    plist = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key><string>{label}</string>
-    <key>ProgramArguments</key>
-    <array>
-{args_xml}    </array>
-    <key>RunAtLoad</key><true/>
-    <key>KeepAlive</key><true/>
-    <key>StandardOutPath</key><string>{log_path}</string>
-    <key>StandardErrorPath</key><string>{log_path}</string>
-</dict>
-</plist>
-"""
     target = d / f"{label}.plist"
-    target.write_text(plist, encoding="utf-8")
+    target.write_bytes(plistlib.dumps({
+        "Label": label,
+        "ProgramArguments": program_args,
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        "StandardOutPath": str(log_path),
+        "StandardErrorPath": str(log_path),
+    }))
     return target
 
 
@@ -129,6 +124,8 @@ def load_launch_agent(plist: Path, label: str) -> bool:
     res = run(["launchctl", "bootstrap", f"gui/{uid}", str(plist)])
     if res.returncode != 0:
         res = run(["launchctl", "load", "-w", str(plist)])
+    if res.returncode:
+        say(f"   launchctl failed: {res.stderr.strip() or res.stdout.strip()}", "r")
     return res.returncode == 0
 
 
@@ -137,6 +134,14 @@ def load_launch_agent(plist: Path, label: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 def main() -> int:
+    try:
+        return _main()
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        say(f"Setup failed: {exc}", "r")
+        return 1
+
+
+def _main() -> int:
     splash()
     say("Converts documents you drop into folders you choose into Markdown for your agent.\n")
 
@@ -148,11 +153,7 @@ def main() -> int:
         return 1
 
     # Preserve any folders already configured (safe to re-run setup, e.g. after a rename).
-    existing: dict = {}
-    try:
-        existing = json.loads((REPO / "config.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        existing = {}
+    existing = core.load_config(REPO / "config.json")
     watch_folders: list[str] = list(existing.get("watchFolders", []))
 
     step("Choosing a first folder to watch (optional)")
@@ -170,11 +171,8 @@ def main() -> int:
 
     # 1. config.json
     step("Writing config.json")
-    config = {
-        "watchFolders": watch_folders,
-        "pollSeconds": existing.get("pollSeconds", 2),
-    }
-    (REPO / "config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    config = {**existing, "watchFolders": watch_folders}
+    core.save_config(config, REPO / "config.json")
     (REPO / "logs").mkdir(exist_ok=True)
     if watch_folders:
         say(f"   watching {watch_folders[0]}", "g")
@@ -183,32 +181,58 @@ def main() -> int:
 
     # 2. optional converters (markitdown adds PDF/PPTX/XLSX/XLS; textutil covers the rest)
     step("Installing optional converters (markitdown for PDF/Office, html2text)")
+    python = sys.executable
+    setup_ok = True
     if os.environ.get("AUTOMDCONVERT_SKIP_PIP"):
         say("   (skipped pip install)", "y")
     else:
-        pkgs = ["markitdown[docx,pptx,xlsx,xls,pdf]", "html2text", "ebooklib", "openpyxl"]
-        r = run([sys.executable, "-m", "pip", "install", "--user", "--quiet", *pkgs])
-        if r.returncode != 0:
-            # Homebrew/externally-managed Pythons reject --user; retry the modern way.
-            run([sys.executable, "-m", "pip", "install", "--break-system-packages", "--quiet", *pkgs])
+        env = REPO / ".venv"
+        env_python = env / "bin" / "python3"
+        if env.is_symlink():
+            raise ValueError("The project .venv must not be a symlink.")
+        if not env_python.exists():
+            result = run([sys.executable, "-m", "venv", str(env)])
+            if result.returncode:
+                say(f"   could not create converter environment: {result.stderr.strip()}", "r")
+                return 1
+        version_check = run([str(env_python), "-c",
+                             "import sys; print('%s.%s' % sys.version_info[:2])"])
+        version = f"{sys.version_info.major}.{sys.version_info.minor}"
+        if version_check.returncode or version_check.stdout.strip() != version:
+            say("   .venv uses a different or unavailable Python version.", "r")
+            say(f"   Recreate it with this Python, then rerun setup:", "y")
+            say(f'     "{sys.executable}" -m venv --clear "{env}"', "b")
+            return 1
+        python = str(env_python)
+        pkgs = ["html2text", "ebooklib", "openpyxl"]
+        if sys.version_info >= (3, 10):
+            pkgs.append("markitdown[docx,pptx,xlsx,xls,pdf]")
+        else:
+            say("   markitdown requires Python 3.10+; basic formats will still work.", "y")
+        r = run([python, "-m", "pip", "install", "--quiet", *pkgs])
+        if r.returncode:
+            setup_ok = False
+            say(f"   converter installation failed: {r.stderr.strip() or r.stdout.strip()}", "r")
     # Report the real capability, regardless of how the install went.
-    have_markitdown = module_available("markitdown")
+    have_markitdown = module_available("markitdown", python)
     if have_markitdown:
-        say("   full format support enabled: PDF, PowerPoint, Excel, Word, and more", "g")
+        say("   markitdown is available (format support depends on installed extras).", "g")
     else:
         say("   Email, Word, RTF, HTML, and text/csv/json convert out of the box.", "y")
-        say("   PDF, PowerPoint, and Excel need markitdown, which is not available yet.", "y")
+        say("   PDF, PowerPoint, legacy Excel, and EPUB need markitdown, which is not available yet.", "y")
+        say("   XLSX uses openpyxl separately.", "y")
         say("   To enable them later, run:", "y")
-        say('     python3 -m pip install --user "markitdown[docx,pptx,xlsx,pdf]"', "b")
+        say("     rerun setup with Python 3.10 or newer", "b")
 
     # 3. drop-zone watcher LaunchAgent
     step("Installing the drop-zone watcher (auto-start at login)")
     watcher_plist = write_launch_agent(
         "com.automdconvert.watcher",
-        [sys.executable, str(REPO / "dropzone" / "watch.py")],
+        [python, str(REPO / "dropzone" / "watch.py")],
         REPO / "logs" / "watcher.log",
     )
     ok = load_launch_agent(watcher_plist, "com.automdconvert.watcher")
+    setup_ok = setup_ok and ok
     say("   watcher running" if ok else "   watcher installed (load it with: launchctl load -w " + str(watcher_plist) + ")",
         "g" if ok else "y")
 
@@ -220,16 +244,18 @@ def main() -> int:
         try:
             sys.path.insert(0, str(REPO / "dropzone"))
             import install_quick_action as qa
-            if qa.install():
+            if qa.install(python=python):
                 say("   installed. Right-click a file in Finder > Quick Actions.", "g")
                 say("   First time only: Quick Actions > Customize... and turn on 'Convert to Markdown'.", "y")
             else:
+                setup_ok = False
                 say("   Quick Action written, but plist validation flagged an issue (see above)", "y")
         except Exception as exc:
+            setup_ok = False
             say(f"   could not install Quick Action: {exc}", "y")
 
     # 4. smoke test
-    step("Smoke test: converting a sample email")
+    step("Smoke test: converting a sample document")
     smoke_test()
 
     # 5. open VS Code
@@ -237,8 +263,11 @@ def main() -> int:
     if code and not os.environ.get("AUTOMDCONVERT_SKIP_OPEN"):
         run([code, str(REPO)])
 
-    print_summary(config, have_markitdown)
-    return 0
+    if setup_ok:
+        print_summary(config, have_markitdown)
+    else:
+        say("Setup incomplete; fix the errors above and rerun setup.", "r")
+    return 0 if setup_ok else 1
 
 
 def smoke_test() -> None:
@@ -256,7 +285,9 @@ def smoke_test() -> None:
         meta, body = core.convert_file(sample)
         target = core.write_markdown(Path(td), meta, body)
         ok = target.exists()
-    say("   converter works" if ok else "   smoke test failed", "g" if ok else "r")
+    if not ok:
+        raise ValueError("smoke test did not produce Markdown")
+    say("   converter works", "g")
 
 
 def print_summary(config: dict, have_markitdown: bool = True) -> None:
@@ -266,7 +297,7 @@ def print_summary(config: dict, have_markitdown: bool = True) -> None:
     if have_markitdown:
         say("Formats: email, Word, PowerPoint, Excel, PDF, HTML, RTF, CSV, and more.")
     else:
-        say("Formats: email, Word, RTF, HTML, text/csv/json now; PDF/PPTX/XLSX after installing markitdown.", "y")
+        say("Formats: email, Word, RTF, HTML, text/csv/json; optional formats depend on installed converters.", "y")
     if folders:
         say("Watching (emails dropped here auto-convert to Markdown):")
         for f in folders:

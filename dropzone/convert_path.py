@@ -21,19 +21,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from shared.convert import core  # noqa: E402
 
 
-def _unique(target: Path) -> Path:
-    """Return target, or target-2.md, target-3.md, ... if it already exists."""
-    if not target.exists():
-        return target
-    stem, parent = target.stem, target.parent
-    n = 2
-    while True:
-        candidate = parent / f"{stem}-{n}.md"
-        if not candidate.exists():
-            return candidate
-        n += 1
-
-
 def _notify(title: str, message: str) -> None:
     # Best effort; keep to controlled text (no filenames) so quoting stays safe.
     try:
@@ -48,8 +35,7 @@ def _notify(title: str, message: str) -> None:
 def _reveal(path: Path) -> None:
     try:
         subprocess.run(
-            ["osascript", "-e", f'tell application "Finder" to reveal (POSIX file "{path}")',
-             "-e", 'tell application "Finder" to activate'],
+            ["open", "-R", str(path)],
             capture_output=True, timeout=10,
         )
     except (OSError, subprocess.SubprocessError):
@@ -58,16 +44,19 @@ def _reveal(path: Path) -> None:
 
 def convert_one(src: Path) -> Path | None:
     """Convert a single file to Markdown beside it. Returns the .md path or None."""
+    if not src.exists():
+        raise FileNotFoundError(f"file does not exist: {src}")
     if not src.is_file() or not core.is_supported(src):
         return None
     meta, body = core.convert_file(src)
     meta["source"] = "quick-action"
-    target = _unique(src.with_suffix(".md"))
-    target.write_text(core.render_markdown(meta, body), encoding="utf-8")
-    return target
+    return core.write_unique_text(src.with_suffix(".md"), core.render_markdown(meta, body))
 
 
 def main(argv: list[str]) -> int:
+    if not argv or argv == ["--help"] or argv == ["-h"]:
+        print(__doc__)
+        return 0 if argv else 1
     paths = [Path(a).expanduser() for a in argv]
     converted: list[Path] = []
     skipped = 0
@@ -100,7 +89,7 @@ def main(argv: list[str]) -> int:
         _notify("AutoMDConvert", " ".join(parts))
         if n == 1:
             _reveal(converted[0])
-        return 0
+        return 1 if errors else 0
 
     if errors:
         _notify("AutoMDConvert", f"Could not convert {errors} file{'s' if errors != 1 else ''}")

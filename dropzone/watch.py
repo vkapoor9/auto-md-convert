@@ -13,6 +13,7 @@ by bootstrap.py, or manually: python3 dropzone/watch.py
 
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 from pathlib import Path
@@ -38,37 +39,65 @@ def _candidate_dirs(cfg: dict) -> list[Path]:
     return dirs
 
 
-def _convert(src: Path, cfg: dict) -> None:
+def _signature(src: Path) -> tuple[int, int, int, int]:
+    stat = src.lstat()
+    return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns
+
+
+def _convert(src: Path, cfg: dict) -> bool:
+    target = None
     try:
+        before = _signature(src)
         meta, body = core.convert_file(src)
+        if src.is_symlink() or _signature(src) != before:
+            raise OSError("source changed during conversion; will retry")
+        archive = src.parent / ARCHIVE_DIRNAME
+        if archive.is_symlink():
+            raise OSError("archive directory must not be a symlink")
+        archive.mkdir(exist_ok=True)
+        target = core.write_markdown(src.parent, meta, body)
+        if src.is_symlink() or _signature(src) != before:
+            raise OSError("source changed before archiving; will retry")
+        archived = core.publish_unique_file(src, archive / src.name)
+        try:
+            if src.is_symlink() or _signature(src) != before:
+                raise OSError("source changed while archiving; will retry")
+            src.unlink()
+        except BaseException:
+            archived.unlink()
+            raise
     except Exception as exc:  # keep the watcher alive on a bad file
-        _log(f"skip ({src.suffix or 'file'}) {src.name}: {exc}")
-        return
-    target = core.write_markdown(src.parent, meta, body)
-    archive = src.parent / ARCHIVE_DIRNAME
-    archive.mkdir(exist_ok=True)
-    try:
-        src.replace(archive / src.name)
-    except OSError:
-        pass
+        if target is not None:
+            try:
+                target.unlink()
+            except OSError as cleanup:
+                _log(f"could not remove incomplete conversion {target}: {cleanup}")
+        _log(f"retry ({src.suffix or 'file'}) {src.name}: {exc}")
+        return False
     _log(f"captured {target}")
+    return True
 
 
-def _scan_once(cfg: dict, seen: set[Path]) -> None:
+def _scan_once(cfg: dict, seen: set[Path]) -> bool:
+    seen.clear()
+    ok = True
     for directory in _candidate_dirs(cfg):
         try:
             entries = [
                 p for p in directory.iterdir()
-                if p.is_file() and not p.name.startswith(".") and core.is_supported(p)
+                if not p.is_symlink() and p.is_file() and
+                not p.name.startswith(".") and core.is_supported(p)
             ]
-        except OSError:
+        except OSError as exc:
+            _log(f"cannot scan {directory}: {exc}")
+            ok = False
             continue
         for src in entries:
             if ARCHIVE_DIRNAME in src.parts:
                 continue
             # Wait until the file stops growing (apps write it progressively).
             try:
-                size = src.stat().st_size
+                before = _signature(src)
             except OSError:
                 continue
             key = src.resolve()
@@ -76,33 +105,45 @@ def _scan_once(cfg: dict, seen: set[Path]) -> None:
                 continue
             time.sleep(0.4)
             try:
-                if src.stat().st_size != size:
+                if src.is_symlink() or _signature(src) != before:
                     continue  # still being written; pick it up next pass
             except OSError:
                 continue
             seen.add(key)
-            _convert(src, cfg)
+            if not _convert(src, cfg):
+                ok = False
+    return ok
 
 
 def main() -> int:
-    cfg = core.load_config()
-    run_once = "--once" in sys.argv[1:]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--once", action="store_true", help="scan once, then exit")
+    args = parser.parse_args()
+    try:
+        cfg = core.load_config()
+    except ValueError as exc:
+        _log(str(exc))
+        return 1
     seen: set[Path] = set()
-    if run_once:
-        _scan_once(cfg, seen)
-        return 0
+    if args.once:
+        return 0 if _scan_once(cfg, seen) else 1
     folders = _candidate_dirs(cfg)
     if folders:
         _log(f"watching {len(folders)} folder(s): " + ", ".join(str(f) for f in folders))
     else:
         _log("no watchFolders configured; nothing is being watched (add one with watch_folder.py)")
-    poll = max(1, int(cfg.get("pollSeconds", 2)))
+    poll = cfg["pollSeconds"]
     while True:
         try:
             _scan_once(cfg, seen)
         except Exception as exc:  # never let a transient error kill the loop
             _log(f"scan error: {exc}")
-        time.sleep(poll)
+        # Bound each sleep so large, valid JSON numbers cannot overflow time.sleep.
+        remaining = poll
+        while remaining > 0:
+            interval = min(remaining, 3600)
+            time.sleep(interval)
+            remaining -= interval
 
 
 if __name__ == "__main__":
