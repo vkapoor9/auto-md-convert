@@ -271,4 +271,4 @@ projects need their own ignore rules; the watcher does not change their
 
 ---
 
-Crafted by VK.
+Crafted by VK. Released under the MIT License (see `LICENSE`).

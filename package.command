@@ -18,7 +18,7 @@ echo "Building ${NAME} package..."
 
 # Everything the other Mac needs; local state and personal notes are left behind.
 mkdir -p "$STAGE/shared/convert" "$STAGE/dropzone"
-cp README.md bootstrap.py config.example.json handoff-prompt.md \
+cp README.md LICENSE bootstrap.py config.example.json handoff-prompt.md \
   setup.command package.command shortcuts.zsh splash.py "$STAGE/"
 cp shared/convert/__init__.py shared/convert/core.py "$STAGE/shared/convert/"
 cp dropzone/convert_path.py dropzone/install_quick_action.py \

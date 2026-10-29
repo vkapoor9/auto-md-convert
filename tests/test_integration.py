@@ -295,7 +295,7 @@ class InstallIntegrationTests(unittest.TestCase):
     def test_package_includes_only_runtime_files_and_works_without_terminal(self):
         repo = self.root / "repo"
         repo.mkdir()
-        for name in ("README.md", "bootstrap.py", "config.example.json", "handoff-prompt.md",
+        for name in ("README.md", "LICENSE", "bootstrap.py", "config.example.json", "handoff-prompt.md",
                      "setup.command", "package.command", "shortcuts.zsh", "splash.py", ".gitignore"):
             shutil.copy2(REPO / name, repo / name)
         for name in ("shared", "dropzone"):
@@ -315,6 +315,7 @@ class InstallIntegrationTests(unittest.TestCase):
         with zipfile.ZipFile(archives[0]) as archive:
             names = archive.namelist()
             self.assertIn("auto-md-convert/setup.command", names)
+            self.assertIn("auto-md-convert/LICENSE", names)
             self.assertIn("auto-md-convert/shared/convert/core.py", names)
             self.assertFalse(any("private" in n or "/.venv/" in n or n.endswith("config.json")
                                  or n.endswith(".env") for n in names))
