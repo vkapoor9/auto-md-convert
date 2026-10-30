@@ -28,7 +28,7 @@ subject/from/to/date; other documents carry title/source_file/type. Example emai
 ```
 ---
 subject: "Re: Q3 migration go/no-go"
-from: "Alice Vendor <alice@vendor.com>"
+from: "Alice Vendor <alice@example.com>"
 to: "You <you@example.com>"
 cc: "Bob Lead <bob@example.com>"
 date: "Mon, 17 Aug 2026 09:14:22 -0400"

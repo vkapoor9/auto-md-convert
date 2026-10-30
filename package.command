@@ -28,7 +28,7 @@ cp .gitignore "$STAGE/"
 chmod +x "$STAGE/setup.command" "$STAGE/package.command"
 
 mkdir -p "$HOME/Desktop"
-ditto -c -k --sequesterRsrc --keepParent "$STAGE" "$TEMP/package.zip"
+ditto -c -k --norsrc --keepParent "$STAGE" "$TEMP/package.zip"
 mv -f "$TEMP/package.zip" "$OUT"
 
 echo ""
