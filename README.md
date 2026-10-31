@@ -2,7 +2,7 @@
 
 Drag an email out of Outlook into a folder, and your AI agent can read it seconds later.
 
-I built this because my coding agent kept missing context that only existed in email threads. Now I drag the `.eml` into the project's folder, and a background watcher on my Mac turns it into clean Markdown, attachments included, right where the agent already looks. No plugins, no mail account access, no scripting Outlook.
+I built this because my coding agent kept missing context that only existed in email threads. Now I drag the `.eml` into the project's `emails/` folder, and a background watcher on my Mac turns it into clean Markdown, attachments included, right where the agent already looks. No plugins, no mail account access, no scripting Outlook.
 
 It isn't only for email. Word, PowerPoint, Excel, PDF, HTML, RTF, CSV and more work the same way. You pick which folders to watch; anything dropped elsewhere stays untouched.
 
@@ -37,7 +37,7 @@ email, Word, PDF, and everything else. No app scripting or plugins required.
 ## Quick start
 
 1. Confirm Python 3.9+ is installed (`python3 --version`); use 3.10+ for all formats.
-2. Double-click `setup.command` (or run `python3 bootstrap.py`).
+2. Double-click `setup.command`. If macOS blocks it as a downloaded script, open Terminal in this folder and run `python3 bootstrap.py` instead.
 3. When asked, type a folder to watch, or press Return to skip and add one later.
 
 That is it. Setup installs the converters, installs a background watcher that
@@ -52,7 +52,7 @@ need optional converters (setup installs them and reports failures).
 ## Install on another Mac
 
 Double-click `package.command` (or run `./package.command`). It writes
-`~/Desktop/auto-md-convert-YYYY-MM-DD.zip` containing just the tool — your
+`~/Desktop/auto-md-convert-YYYY-MM-DD.zip` containing just the tool; your
 `config.json`, logs, virtual environments, and notes stay on this Mac. Packaging
 uses an explicit list of runtime files, so unrelated files in the repository are
 never included. It also runs non-interactively.
@@ -61,8 +61,7 @@ On the other Mac:
 
 1. Copy the zip over (AirDrop, iCloud Drive, USB) and unzip it.
 2. Move the `auto-md-convert` folder where you want it to live, e.g. `~/ai/auto-md-convert`.
-3. Right-click `setup.command` and choose **Open** (first launch only, so Gatekeeper
-   allows a downloaded script), then confirm.
+3. Double-click `setup.command`. If macOS blocks it as a downloaded script, open Terminal in that folder and run `python3 bootstrap.py` instead, or allow it under System Settings > Privacy & Security.
 4. When asked, type a folder to watch, or press Return to skip.
 
 Setup is per-machine: it installs the converters, the login watcher, and the Finder
