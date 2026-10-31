@@ -1,12 +1,12 @@
 # AutoMDConvert
 
-Turn documents into clean Markdown automatically, so a coding agent working in a
-project can read them for strategy, decisions, and task tracking. It handles most
-common file types: email, Word, PowerPoint, Excel, PDF, HTML, RTF, CSV, and more.
+Drag an email out of Outlook into a folder, and your AI agent can read it seconds later.
 
-You pick which folders to watch. Drag a file into a watched folder and a background
-watcher turns it into a readable `.md` file. Drop a file anywhere else and it stays
-untouched. That is the whole tool.
+I built this because my coding agent kept missing context that only existed in email threads. Now I drag the `.eml` into the project's folder, and a background watcher on my Mac turns it into clean Markdown, attachments included, right where the agent already looks. No plugins, no mail account access, no scripting Outlook.
+
+It isn't only for email. Word, PowerPoint, Excel, PDF, HTML, RTF, CSV and more work the same way. You pick which folders to watch; anything dropped elsewhere stays untouched.
+
+Free and open source under the MIT License. macOS only.
 
 ## Requirements
 
@@ -169,6 +169,8 @@ Services > Files and Folders.)
 - PDF: `.pdf`
 - Web and markup: `.html`, `.htm`, `.xml`, `.json`
 - Plain text and books: `.txt`, `.epub`
+
+Outlook's `.msg` format is not supported. The watcher needs `.eml`, the format Outlook for Mac produced in the workflow this tool was built for. Any mail app that can save a standard `.eml` should work; the test suite uses generated emails rather than exports from each mail app, so check one message from yours.
 
 Email, Word, RTF, ODT, HTML, and text/csv/json/xml convert out of the box (macOS
 `textutil` plus built-ins), and `.xlsx` uses `openpyxl`. PDF, PowerPoint (`.pptx`),
