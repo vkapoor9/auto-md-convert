@@ -90,7 +90,7 @@ class EntrypointTests(unittest.TestCase):
             result = watch_folder.main(["add", str(self.root / "project")])
         self.assertEqual(result, 1)
         self.assertEqual(config.read_text(), "{broken")
-        self.assertFalse((self.root / "project" / "emails").exists())
+        self.assertFalse((self.root / "project" / "agent-inbox").exists())
 
     def test_folder_commands_preserve_custom_config(self):
         config = self.root / "config.json"
@@ -103,6 +103,12 @@ class EntrypointTests(unittest.TestCase):
             self.assertEqual(watch_folder.main(["remove", str(self.root / "project")]), 0)
         self.assertEqual(json.loads(config.read_text()),
                          {"watchFolders": [], "pollSeconds": 1.5, "custom": "keep"})
+
+    def test_folder_target_is_the_project_agent_inbox(self):
+        project = self.root / "project"
+        self.assertEqual(watch_folder.resolve_target(str(project)), (project / "agent-inbox").resolve())
+        self.assertEqual(watch_folder.resolve_target(str(project / "agent-inbox")),
+                         (project / "agent-inbox").resolve())
 
     def test_folder_command_rejects_extra_arguments(self):
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):

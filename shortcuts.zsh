@@ -4,7 +4,7 @@
 #   source /path/to/auto-md-convert/shortcuts.zsh
 #
 # Then, from any directory:
-#   add-folder <path>      enable a folder (watches <path>/emails)
+#   add-folder <path>      enable a folder (watches <path>/agent-inbox)
 #   list-folder            show watched folders
 #   remove-folder <path>   disable a folder
 

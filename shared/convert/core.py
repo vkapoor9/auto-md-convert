@@ -65,6 +65,9 @@ _TEXTUTIL_FIRST = {".rtf", ".doc", ".odt", ".wordml", ".webarchive"}
 _XLSX_FIRST = {".xlsx", ".xlsm"}
 
 _MAX_NESTED_EMAIL_DEPTH = 10
+
+# The folder inside a project that the watcher converts. `add <project>` targets it.
+INBOX_DIRNAME = "agent-inbox"
 _LOG = logging.getLogger(__name__)
 
 

@@ -2,13 +2,13 @@
 """Choose which folders the watcher converts. Nothing is watched by default.
 
 Usage (run from anywhere):
-  python3 dropzone/watch_folder.py add [PATH]     enable a folder (default: ./emails)
+  python3 dropzone/watch_folder.py add [PATH]     enable a folder (default: ./agent-inbox)
   python3 dropzone/watch_folder.py remove [PATH]  disable a folder
   python3 dropzone/watch_folder.py list           show watched folders
 
-PATH resolves to an "emails" folder: a bare project path gets "/emails" appended,
-a path already ending in "emails" is used as-is. Only that exact folder is watched;
-subfolders and other locations keep their .eml files raw (no conversion).
+PATH resolves to an "agent-inbox" folder: a bare project path gets "/agent-inbox"
+appended, a path already ending in "agent-inbox" is used as-is. Only that exact
+folder is watched; subfolders and other locations keep their files as they are.
 
 After a change it restarts the watcher so it takes effect immediately.
 """
@@ -39,7 +39,7 @@ def save(cfg: dict) -> None:
 def resolve_target(arg: str | None) -> Path:
     base = Path(arg).expanduser() if arg else Path.cwd()
     base = base.resolve()
-    return base if base.name == "emails" else base / "emails"
+    return base if base.name == core.INBOX_DIRNAME else base / core.INBOX_DIRNAME
 
 
 def restart_watcher() -> None:
@@ -84,7 +84,7 @@ def cmd_add(arg: str | None) -> int:
     folders.append(entry)
     save(cfg)
     print(f"Now watching: {entry}")
-    print("Drag emails into that exact folder to auto-convert them to Markdown.")
+    print("Drop files into that exact folder to auto-convert them to Markdown.")
     restart_watcher()
     return 0
 

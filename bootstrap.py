@@ -159,12 +159,12 @@ def _main() -> int:
     step("Choosing a first folder to watch (optional)")
     if watch_folders:
         say(f"Keeping {len(watch_folders)} folder(s) already configured.", "g")
-    say("Enter a project (its emails/ folder is watched), or leave blank to add later.")
-    first = ask("Project or emails folder to watch (blank to skip)", "")
+    say(f"Enter a project (its {core.INBOX_DIRNAME}/ folder is watched), or leave blank to add later.")
+    first = ask(f"Project or {core.INBOX_DIRNAME} folder to watch (blank to skip)", "")
     if first.strip():
         target = Path(first).expanduser().resolve()
-        if target.name != "emails":
-            target = target / "emails"
+        if target.name != core.INBOX_DIRNAME:
+            target = target / core.INBOX_DIRNAME
         target.mkdir(parents=True, exist_ok=True)
         if str(target) not in watch_folders:
             watch_folders.append(str(target))
@@ -299,15 +299,15 @@ def print_summary(config: dict, have_markitdown: bool = True) -> None:
     else:
         say("Formats: email, Word, RTF, HTML, text/csv/json; optional formats depend on installed converters.", "y")
     if folders:
-        say("Watching (emails dropped here auto-convert to Markdown):")
+        say("Watching (files dropped here auto-convert to Markdown):")
         for f in folders:
             say(f"  {f}")
     else:
         say("No folders are watched yet. Enable one when ready:")
         say(f"  python3 {wf} add <project-path>", "b")
     say("\nHow it works:")
-    say("  Drag an email into a watched folder and it becomes a clean Markdown file.")
-    say("  Drop a .eml anywhere else, or in a subfolder, to keep it as a raw .eml.")
+    say("  Drop a file into a watched folder and it becomes a clean Markdown file.")
+    say("  Drop it anywhere else, or in a subfolder, to keep it as it is.")
     say("  Or right-click a file in Finder > Quick Actions (first time: Quick Actions > Customize to enable).")
     say(f"\nManage folders: python3 {wf} list | add <path> | remove <path>")
 

@@ -40,10 +40,10 @@ class ConfigTests(unittest.TestCase):
                 self.assertEqual(self.path.read_text(), content)
 
     def test_paths_are_normalized_and_deduplicated_relative_to_config(self):
-        self.path.write_text(json.dumps({"watchFolders": ["emails", "./emails"],
+        self.path.write_text(json.dumps({"watchFolders": ["agent-inbox", "./agent-inbox"],
                                         "pollSeconds": 1.5, "custom": "keep"}))
         cfg = core.load_config()
-        self.assertEqual(cfg["watchFolders"], [str((self.path.parent / "emails").resolve())])
+        self.assertEqual(cfg["watchFolders"], [str((self.path.parent / "agent-inbox").resolve())])
         self.assertEqual(cfg["pollSeconds"], 1.5)
         self.assertEqual(cfg["custom"], "keep")
 

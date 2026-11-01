@@ -1,6 +1,6 @@
 {
   "watchFolders": [
-    "~/ai/my-project/emails"
+    "~/ai/my-project/agent-inbox"
   ],
   "pollSeconds": 2
 }

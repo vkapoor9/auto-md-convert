@@ -69,7 +69,7 @@ class OperationsTests(unittest.TestCase):
         self.assertEqual(any(c.startswith("markitdown") for c in pip), sys.version_info >= (3, 10))
         fake_qa.install.assert_called_once_with(python=env_python)
         load.assert_called_once()
-        self.assertTrue((self.root / "project/emails").is_dir())
+        self.assertTrue((self.root / "project/agent-inbox").is_dir())
         self.assertIn("Setup complete.", self.output.getvalue())
 
     def test_setup_reports_pip_failure(self):

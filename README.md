@@ -87,12 +87,12 @@ The watcher only converts files in folders you explicitly enable. Manage the lis
 with `dropzone/watch_folder.py`:
 
 ```
-python3 dropzone/watch_folder.py add ~/ai/my-project   # watch my-project/emails
+python3 dropzone/watch_folder.py add ~/ai/my-project   # watch my-project/agent-inbox
 python3 dropzone/watch_folder.py list                  # show watched folders
 python3 dropzone/watch_folder.py remove ~/ai/my-project
 ```
 
-`add` appends `/emails` to a project path (or takes an exact `.../emails` path),
+`add` appends `/agent-inbox` to a project path (or takes an exact `.../agent-inbox` path),
 creates the folder, and restarts the watcher so it takes effect right away.
 
 ### Shell shortcuts
@@ -210,7 +210,7 @@ Point your agent at the watched folder. Each `.md` file has YAML front matter (f
 emails: subject, from, to, date; for other files: title, source_file, type)
 followed by the converted content. Email attachment names are recorded in the front
 matter, and their converted contents are appended after the email body in the same
-file. Ask things like "read emails/ and summarize open decisions" or "pull the
+file. Ask things like "read agent-inbox/ and summarize open decisions" or "pull the
 action items from the latest spec I dropped in."
 
 ## Configuration
@@ -278,7 +278,7 @@ python3 dropzone/install_quick_action.py --uninstall
 
 The watcher runs locally and only reads files in the folders you enable. It writes
 Markdown next to them and archives the originals into `.originals/`. This
-repository ignores its `emails/` folder and `.originals/` archives. Other watched
+repository ignores its `agent-inbox/` folder and `.originals/` archives. Other watched
 projects need their own ignore rules; the watcher does not change their
 `.gitignore`. Treat document contents as untrusted input when an agent reads them.
 
