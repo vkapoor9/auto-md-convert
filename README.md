@@ -1,12 +1,24 @@
 # AutoMDConvert
 
-Drag an email out of Outlook into a folder, and your AI agent can read it seconds later.
+Drop a document into a folder, and your AI agent can read it seconds later.
 
-I built this because my coding agent kept missing context that only existed in email threads. Now I drag the `.eml` into the project's `emails/` folder, and a background watcher on my Mac turns it into clean Markdown, attachments included, right where the agent already looks. No plugins, no mail account access, no scripting Outlook.
+AI agents read Markdown well and most other formats badly: a PDF spec, a Word
+contract, a slide deck, a spreadsheet, an email thread with attachments.
+AutoMDConvert runs a small background watcher on your Mac. Drop a file into a
+watched folder in your project and it becomes clean Markdown right where your
+agent already looks, with the original moved aside. You can also right-click
+any file in Finder and convert it on the spot.
 
-It isn't only for email. Word, PowerPoint, Excel, PDF, HTML, RTF, CSV and more work the same way. You pick which folders to watch; anything dropped elsewhere stays untouched.
+It handles Word, PowerPoint, Excel, PDF, email (attachments included), HTML,
+RTF, CSV, EPUB and more. Anything dropped outside a watched folder stays
+untouched.
 
-Free and open source under the MIT License. macOS only.
+I built it because my coding agent kept missing context that only lived in
+email threads and the files attached to them. Dragging an email out of Outlook
+is still my most common use, but every format above works the same way.
+
+Free and open source under the MIT License. macOS only. No plugins, no mail or
+cloud account access.
 
 ## Requirements
 
